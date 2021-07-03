@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Models;
+using WebAPI.Data;
 
 
 namespace WebAPI.Controllers
@@ -11,92 +12,78 @@ namespace WebAPI.Controllers
     [Route("api/[controller]")]
     public class PersonController: ControllerBase
     {
-        // Add database initialization soon
+        // Database initialization
 
-
-        private int _IdCounter = 0;
-        public void SetIdCounter(int idx)
+        private readonly AppDbContex _context;
+        public PersonController(AppDbContex context)
         {
-
-
-             _IdCounter = idx + 1;
+            _context = context;
         }
-
-        public int GetIdCounter()
-        {
-            return _IdCounter;
-        }
-        private static readonly List<string> Names = new List<string>
-        {
-            "Vasya"
-        };
-        private static readonly List<string> Surnames = new List<string>
-        {
-            "Kit"
-        };
-
+        
         [HttpGet]
-        public IEnumerable<Person> GetPeople()
+        public  List<Person> GetPersons([FromQuery]string orderBy, string search)
         {
-            SetIdCounter(0);
-            var random = new Random();
+            var personList = new List<Person>();
 
-            return Enumerable.Range(0, 4).Select(Index => new Person
+            if(!String.IsNullOrWhiteSpace(search))
             {
-                ID = GetIdCounter(),
-                Age = random.Next(10, 90),
-                Name = Names[random.Next(Names.Count)],
-                Surname = Surnames[random.Next(Surnames.Count)]
+                personList = _context.Persons.Where(x => x.Name.ToLower().Contains(search.ToLower())).ToList();
+            }
 
-            }).ToArray();
+            else
+            {
+                personList = _context.Persons.ToList();
+            }
 
+            if(!String.IsNullOrEmpty(orderBy))
+            {
+                switch(orderBy.ToLower())
+                {
+                    case "name":
+                    personList = _context.Persons.OrderBy(x => x.Name).ToList();
+                    break;
+
+                    case "surname":
+                    personList = _context.Persons.OrderBy(x => x.Surname).ToList();
+                    break;
+
+                    case "age":
+                    personList = _context.Persons.OrderBy(x => x.Age).ToList();
+                    break;
+
+                }
+
+            }
+
+            return personList;
+          
         }
 
         [HttpPost]
-        public string ReturnResponseMessage([FromRoute] Person person)
+        public string AddUser([FromBody] Person person)
         {
-            return "OK";
-        }
-
-        [HttpPut]
-        public string AddNewPersonData([FromBody] Person person)
-        {
-            // Create new contact from json request.
-            // Need database to add full user.
-
-            // var NewPerson = new Person
-            // {
-            //    ID = person.ID,
-            //    Age = person.Age,
-            //    Name = person.Name,
-            //    Surname = person.Surname       
-            // };
-
-            // if(NewPerson == null)
-            // {
-            //     throw new Exception();
-            // }
-
-            // Updating.
-            Names.Add(person.Name);
-            Surnames.Add(person.Surname);
-
-            return "Person added successfully! ";
-
-        }
-
-        [HttpDelete]
-        public string DeleteCurrentUser([FromBody] Person person)
-        {
-            if(Names.Contains(person.Name) && Surnames.Contains(person.Surname))
+            if(person == null)
             {
-                Names.Remove(person.Name);
-                Surnames.Remove(person.Surname);
-
-                return "Person deleted successfully! ";
+                throw new Exception();
             }
 
-            return "Can not delete user. User does not exists! ";
+            var NewPerson = new Person
+            {
+                ID = person.ID,
+                Name = person.Name,
+                Surname = person.Surname,
+                Age = person.Age
+            };
+
+
+            _context.Add(NewPerson);
+            _context.SaveChanges();
+
+            return "User added successfully! ";
+            
         }
+        
+
+
     }
 }
